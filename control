@@ -1,0 +1,9 @@
+Package: com.ps.flexmoji
+Name: Flexmoji
+Depends: mobilesubstrate, firmware (>= 6.0), firmware (<< 10.0)
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Unrestricted iOS emoji font size.
+Maintainer: PoomSmart
+Author: PoomSmart
+Section: Tweaks
