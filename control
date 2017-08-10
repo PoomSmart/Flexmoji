@@ -1,5 +1,5 @@
 Package: com.ps.flexmoji
-Name: Flexmoji
+Name: Flexmoji [Beta]
 Depends: mobilesubstrate, firmware (>= 6.0), firmware (<< 10.0)
 Version: 1.0.0
 Architecture: iphoneos-arm
