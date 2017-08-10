@@ -4,27 +4,29 @@
 #import "../EmojiAttributes/WebCoreSupport/CoreGraphicsSPI.h"
 #import <CoreText/CoreText.h>
 
-BOOL isEmoji = NO;
-
 BOOL (*CTFontIsAppleColorEmoji)(CTFontRef);
 extern "C" bool CGFontGetGlyphAdvancesForStyle(CGFontRef, CGAffineTransform *, CGFontRenderingStyle, const CGGlyph *, size_t, CGSize *);
 
-CGFloat (*GetEffectiveSize)(void *);
-int (*IsAppleColorEmoji)(void *);
-int (*_CTFontGetWebKitEmojiRenderMode)();
+/*float (*GetEffectiveSize)(void *);
+   int (*IsAppleColorEmoji)(void *);
+   int (*_CTFontGetWebKitEmojiRenderMode)();*/
 
-%hookf(int, IsAppleColorEmoji, void *arg0) {
+/*%hookf(int, IsAppleColorEmoji, void *arg0) {
     return %orig;
-}
+   }
 
-%hookf(int, _CTFontGetWebKitEmojiRenderMode) {
+   %hookf(int, _CTFontGetWebKitEmojiRenderMode) {
     return %orig;
-}
+   }
 
-
-%hookf(CGFloat, GetEffectiveSize, void *arg0) {
+   %hookf(float, GetEffectiveSize, void *arg0) {
     return %orig;
-}
+   }*/
+
+/*void (*adjustGlyphsAndAdvances)(void *);
+   %hookf(void, adjustGlyphsAndAdvances, void *arg0) {
+
+   }*/
 
 const void *unadjustedPoint;
 BOOL overridePoint = NO;
@@ -42,24 +44,25 @@ void (*drawGlyphs)(void *, void *, const void *, const void *, int, int, const v
     overridePoint = NO;
 }
 
-CTFontRef (*FontPlatformData_ctFont)(void *);
-%hookf(CTFontRef, FontPlatformData_ctFont, void *arg0) {
-    bool *isEmoji;
+bool *findIsEmoji(void *arg0) {
 #if __LP64__
     if (isiOS9Up)
-        isEmoji = (bool *)((uint8_t *)arg0 + 0x2B);
+        return (bool *)((uint8_t *)arg0 + 0x2B);
     else if (isiOS7Up)
-        isEmoji = (bool *)((uint8_t *)arg0 + 0x8);
-    else
-        isEmoji = (bool *)((uint8_t *)arg0 + 0xC);
+        return (bool *)((uint8_t *)arg0 + 0x8);
+    return (bool *)((uint8_t *)arg0 + 0xC);
 #else
     if (isiOS9Up)
-        isEmoji = (bool *)((uint8_t *)arg0 + 0x1F);
+        return (bool *)((uint8_t *)arg0 + 0x1F);
     else if (isiOS7Up)
-        isEmoji = (bool *)((uint8_t *)arg0 + 0x8);
-    else
-        isEmoji = (bool *)((uint8_t *)arg0 + 0xC);
+        return (bool *)((uint8_t *)arg0 + 0x8);
+    return (bool *)((uint8_t *)arg0 + 0xC);
 #endif
+}
+
+CTFontRef (*FontPlatformData_ctFont)(void *);
+%hookf(CTFontRef, FontPlatformData_ctFont, void *arg0) {
+    bool *isEmoji = findIsEmoji(arg0);
     bool forEmoji = *isEmoji;
     *isEmoji = NO;
     CTFontRef font = %orig;
@@ -88,20 +91,15 @@ CGFloat (*platformWidthForGlyph)(void *, CGGlyph);
 
 %end
 
-/*void (*adjustGlyphsAndAdvances)(void *);
-   %hookf(void, adjustGlyphsAndAdvances, void *arg0) {
-
-   }*/
-
 %ctor {
     if (_isTarget(TargetTypeGUINoExtension, @[@"com.apple.WebKit.WebContent"])) {
         MSImageRef ctref = MSGetImageByName(realPath2(@"/System/Library/Frameworks/CoreText.framework/CoreText"));
         MSImageRef wcref = MSGetImageByName(realPath2(@"/System/Library/PrivateFrameworks/WebCore.framework/WebCore"));
-        GetEffectiveSize = (CGFloat (*)(void *))MSFindSymbol(ctref, "__ZNK5TFont16GetEffectiveSizeEv");
-        IsAppleColorEmoji = (int (*)(void *))MSFindSymbol(ctref, "__ZNK5TFont17IsAppleColorEmojiEv");
-        _CTFontGetWebKitEmojiRenderMode = (int (*)())MSFindSymbol(ctref, "_CTFontGetWebKitEmojiRenderMode");
-        if (IsAppleColorEmoji == NULL)
-            IsAppleColorEmoji = (int (*)(void *))MSFindSymbol(ctref, "__ZNK9TBaseFont17IsAppleColorEmojiEv");
+        //GetEffectiveSize = (float (*)(void *))MSFindSymbol(ctref, "__ZNK5TFont16GetEffectiveSizeEv");
+        //IsAppleColorEmoji = (int (*)(void *))MSFindSymbol(ctref, "__ZNK5TFont17IsAppleColorEmojiEv");
+        //if (IsAppleColorEmoji == NULL)
+        //IsAppleColorEmoji = (int (*)(void *))MSFindSymbol(ctref, "__ZNK9TBaseFont17IsAppleColorEmojiEv");
+        //_CTFontGetWebKitEmojiRenderMode = (int (*)())MSFindSymbol(ctref, "_CTFontGetWebKitEmojiRenderMode");
         CTFontIsAppleColorEmoji = (BOOL (*)(CTFontRef))MSFindSymbol(ctref, "_CTFontIsAppleColorEmoji");
         showGlyphsWithAdvances = (void (*)(const void *, const void *, CGContextRef, const CGGlyph *, const CGSize *, unsigned))MSFindSymbol(wcref, "__ZNK7WebCore11FontCascade10drawGlyphsEPNS_15GraphicsContextEPKNS_4FontERKNS_11GlyphBufferEiiRKNS_10FloatPointE");
         if (showGlyphsWithAdvances == NULL)
@@ -118,9 +116,9 @@ CGFloat (*platformWidthForGlyph)(void *, CGGlyph);
         if (platformWidthForGlyph == NULL)
             platformWidthForGlyph = (CGFloat (*)(void *, CGGlyph))MSFindSymbol(wcref, "__ZNK7WebCore14SimpleFontData21platformWidthForGlyphEt");
         //adjustGlyphsAndAdvances = (void (*)(void *))MSFindSymbol(wcref, "__ZN7WebCore21ComplexTextController23adjustGlyphsAndAdvancesEv");
-        HBLogDebug(@"Found GetEffectiveSize: %d", GetEffectiveSize != NULL);
-        HBLogDebug(@"Found IsAppleColorEmoji: %d", IsAppleColorEmoji != NULL);
-        HBLogDebug(@"Found _CTFontGetWebKitEmojiRenderMode: %d", _CTFontGetWebKitEmojiRenderMode != NULL);
+        //HBLogDebug(@"Found GetEffectiveSize: %d", GetEffectiveSize != NULL);
+        //HBLogDebug(@"Found IsAppleColorEmoji: %d", IsAppleColorEmoji != NULL);
+        //HBLogDebug(@"Found _CTFontGetWebKitEmojiRenderMode: %d", _CTFontGetWebKitEmojiRenderMode != NULL);
         HBLogDebug(@"Found showGlyphsWithAdvances: %d", showGlyphsWithAdvances != NULL);
         HBLogDebug(@"Found drawGlyphs: %d", drawGlyphs != NULL);
         HBLogDebug(@"Found FontPlatformData_ctFont: %d", FontPlatformData_ctFont != NULL);
